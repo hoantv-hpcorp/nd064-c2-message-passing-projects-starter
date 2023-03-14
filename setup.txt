@@ -1,0 +1,10 @@
+https://roytuts.com/how-to-install-postgresql-zip-archive-in-windows/
+C:\pgsql\bin>initdb.exe -D C:\projects\devtools\pgsql\data -U postgres -W -E UTF8 -A scram-sha-256
+C:\pgsql\bin>pg_ctl.exe -D C:\projects\devtools\pgsql\data -l logfile start
+C:\pgsql\bin>pg_ctl.exe -D C:\projects\devtools\pgsql\data stop
+
+password: password
+
+
+https://postgis.net/windows_downloads/
+Zip and Installer files The .zip files are just the binaries you can copy into your PostgreSQL installation and then enable in each database as usual. The exe are standard windows setup for 64-bit PostgreSQL.

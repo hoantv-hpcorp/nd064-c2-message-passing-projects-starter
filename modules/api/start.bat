@@ -1,0 +1,7 @@
+SET DB_USERNAME=postgres
+SET DB_PASSWORD=password
+SET DB_HOST=127.0.0.1
+SET DB_PORT=5432
+SET DB_NAME=mydb
+
+flask run --host 0.0.0.0
