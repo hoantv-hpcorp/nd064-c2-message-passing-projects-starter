@@ -8,3 +8,9 @@ password: password
 
 https://postgis.net/windows_downloads/
 Zip and Installer files The .zip files are just the binaries you can copy into your PostgreSQL installation and then enable in each database as usual. The exe are standard windows setup for 64-bit PostgreSQL.
+
+bin/zookeeper-server-start.sh config/zookeeper.properties
+bin/kafka-server-start.sh config/server.properties
+
+python -m grpc_tools.protoc -I./ --python_out=./ --grpc_python_out=./ person.proto
+python -m grpc_tools.protoc -I./ --python_out=./ --grpc_python_out=./ location.proto

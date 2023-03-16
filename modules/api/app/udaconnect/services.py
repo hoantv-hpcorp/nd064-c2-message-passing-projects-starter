@@ -2,6 +2,10 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List
 
+import grpc
+import location_pb2
+import location_pb2_grpc
+
 from app import db
 from app.udaconnect.models import Connection, Location, Person
 from app.udaconnect.schemas import ConnectionSchema, LocationSchema, PersonSchema
@@ -80,6 +84,70 @@ class ConnectionService:
 
         return result
 
+    @staticmethod
+    def find_contacts_buf(person_id: int, start_date: datetime, end_date: datetime, meters=5
+    ) -> List[Connection]:
+        """
+        Finds all Person who have been within a given distance of a given Person within a date range.
+
+        This will run rather quickly locally, but this is an expensive method and will take a bit of time to run on
+        large datasets. This is by design: what are some ways or techniques to help make this data integrate more
+        smoothly for a better user experience for API consumers?
+        """
+
+        # Get location by gRPC
+        channel = grpc.insecure_channel("localhost:5005")
+        stub = location_pb2_grpc.LocationServiceStub(channel)
+        locationPrm = location_pb2.FindByPersonAndDatePrm()
+        locationPrm.person_id=int(person_id)
+        locationPrm.start_date=start_date.strftime("%Y-%m-%d")
+        locationPrm.end_date=end_date.strftime("%Y-%m-%d")
+        response = stub.FindByPersonAndDate(locationPrm)
+        locations = response.locations
+
+        # Cache all users in memory for quick lookup
+        person_map: Dict[str, Person] = {person.id: person for person in PersonService.retrieve_all()}
+
+        # Prepare arguments for queries
+        data = []
+        for location in locations:
+            data.append(
+                {
+                    "person_id": person_id,
+                    "longitude": location.longitude,
+                    "latitude": location.latitude,
+                    "meters": meters,
+                    "start_date": start_date.strftime("%Y-%m-%d"),
+                    "end_date": (end_date + timedelta(days=1)).strftime("%Y-%m-%d"),
+                }
+            )
+
+        result: List[Connection] = []
+        for line in tuple(data):
+            locationPrm = location_pb2.FindByDistancePrm()
+            locationPrm.person_id=int(line.get('person_id'))
+            locationPrm.longitude=line.get('longitude')
+            locationPrm.latitude=line.get('latitude')
+            locationPrm.meters=int(line.get('meters'))
+            locationPrm.start_date=line.get('start_date')
+            locationPrm.end_date=line.get('end_date')
+            response = stub.FindByDistance(locationPrm)
+            locationsInRange = response.locations
+            for locationInRange in locationsInRange:
+                location = Location(
+                    id=locationInRange.id,
+                    person_id=locationInRange.person_id,
+                    creation_time=datetime.strptime(locationInRange.creation_time, '%Y-%m-%d %H:%M:%S')
+                )
+                location.set_wkt_with_coords(locationInRange.latitude, locationInRange.longitude)
+
+                result.append(
+                    Connection(
+                        person=person_map[locationInRange.person_id], location=location,
+                    )
+                )
+
+        return result
 
 class LocationService:
     @staticmethod

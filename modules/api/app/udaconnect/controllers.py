@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 
 from app.udaconnect.models import Connection, Location, Person
@@ -11,8 +12,11 @@ from flask import request
 from flask_accepts import accepts, responds
 from flask_restx import Namespace, Resource
 from typing import Optional, List
+from kafka import KafkaProducer
 
 DATE_FORMAT = "%Y-%m-%d"
+KAFKA_HOST = os.environ["KAFKA_HOST"]
+KAFKA_PORT = os.environ["KAFKA_PORT"]
 
 api = Namespace("UdaConnect", description="Connections via geolocation.")  # noqa
 
@@ -24,10 +28,17 @@ api = Namespace("UdaConnect", description="Connections via geolocation.")  # noq
 class LocationsResource(Resource):
     @accepts(schema=LocationSchema)
     @responds(schema=LocationSchema)
-    def post(self) -> Location:
-        request.get_json()
-        location: Location = LocationService.create(request.get_json())
-        return location
+    def post(self) -> str:
+        # request.get_json()
+        # location: Location = LocationService.create(request.get_json())
+
+        TOPIC_NAME = 'items'
+        KAFKA_SERVER = 'localhost:9092'
+        producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
+        producer.send(TOPIC_NAME, bytes(str(request.get_json()), 'utf-8'))
+        producer.flush()
+
+        return "OK"
 
 @api.route("/locations/<location_id>")
 @api.param("location_id", "Unique ID for a given Location", _in="query")
@@ -74,7 +85,7 @@ class ConnectionDataResource(Resource):
         end_date: datetime = datetime.strptime(request.args["end_date"], DATE_FORMAT)
         distance: Optional[int] = request.args.get("distance", 5)
 
-        results = ConnectionService.find_contacts(
+        results = ConnectionService.find_contacts_buf(
             person_id=person_id,
             start_date=start_date,
             end_date=end_date,
